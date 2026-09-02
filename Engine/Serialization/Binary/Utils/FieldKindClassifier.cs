@@ -4,27 +4,62 @@ namespace Engine.Serialization.Binary.Utils;
 
 internal static class FieldKindClassifier
 {
-    public static (FieldKind Kind, Type? ElementType, Type? UnderlyingType) Classify(Type type)
+    public static TypeShape Classify(Type type)
     {
-        if (type == typeof(string)) return (FieldKind.String, null, null);
-        if (type == typeof(Guid)) return (FieldKind.Guid, null, null);
-        if (type == typeof(DateTime)) return (FieldKind.DateTime, null, null);
-        if (type == typeof(TimeSpan)) return (FieldKind.TimeSpan, null, null);
+        if (type == typeof(string)) return TypeShape.String();
+        if (type == typeof(Guid)) return TypeShape.Guid();
+        if (type == typeof(DateTime)) return TypeShape.DateTime();
+        if (type == typeof(TimeSpan)) return TypeShape.TimeSpan();
 
         var nullableUnderlying = Nullable.GetUnderlyingType(type);
-        if (nullableUnderlying != null) return (FieldKind.Nullable, null, nullableUnderlying);
+        if (nullableUnderlying is not null) return TypeShape.Nullable(nullableUnderlying);
 
-        if (type.IsEnum) return (FieldKind.Enum, null, Enum.GetUnderlyingType(type));
-        if (type.IsPrimitive || type == typeof(decimal)) return (FieldKind.Primitive, null, null);
+        if (type.IsEnum) return TypeShape.Enum(Enum.GetUnderlyingType(type));
+        if (type.IsPrimitive || type == typeof(decimal)) return TypeShape.Primitive();
 
-        if (type.IsArray) return (FieldKind.Array, type.GetElementType(), null);
+        if (type.IsArray)
+            return TypeShape.Array(type.GetElementType()!);
+
+        if (TryGetDictionaryTypes(type, out var keyType, out var valueType))
+            return TypeShape.Dictionary(keyType!, valueType!);
 
         if (type.IsGenericType && typeof(IEnumerable).IsAssignableFrom(type))
         {
             var elementType = type.GetGenericArguments().FirstOrDefault() ?? typeof(object);
-            return (FieldKind.List, elementType, null);
+            return TypeShape.List(elementType);
         }
 
-        return (FieldKind.Nested, null, null);
+        return TypeShape.Nested();
+    }
+
+    private static bool TryGetDictionaryTypes(Type type, out Type? keyType, out Type? valueType)
+    {
+        if (type.IsGenericType)
+        {
+            var def = type.GetGenericTypeDefinition();
+            if (def == typeof(Dictionary<,>) || def == typeof(IDictionary<,>))
+            {
+                var args = type.GetGenericArguments();
+                keyType = args[0];
+                valueType = args[1];
+                return true;
+            }
+        }
+
+        var idict = type
+            .GetInterfaces()
+            .FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IDictionary<,>));
+
+        if (idict is not null)
+        {
+            var args = idict.GetGenericArguments();
+            keyType = args[0];
+            valueType = args[1];
+            return true;
+        }
+
+        keyType = null;
+        valueType = null;
+        return false;
     }
 }

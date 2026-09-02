@@ -1,4 +1,5 @@
-﻿using Test.Infrastructure;
+﻿using Engine.Serialization.Binary.Compression;
+using Test.Infrastructure;
 using Test.Tests;
 
 namespace Test;
@@ -11,8 +12,15 @@ class Program
 
         var runner = new TestRunner(config)
             .Add(new SerializerTest(Serializers.DefaultBinary))
+            .Add(new SerializerTest(Serializers.Binary(new Brotli())))
+            .Add(new SerializerTest(Serializers.Binary(new Deflate())))
+            .Add(new SerializerTest(Serializers.V0Binary))
             .Add(new SerializerTest(Serializers.Json))
             .Add(new SerializerTest(Serializers.Xml));
+            // .Add(new DictionarySerializerTest(Serializers.DefaultBinary))
+            // .Add(new MemberAccessSerializerTest(Serializers.DefaultBinary))
+            // .Add(new PolymorphismSerializerTest(Serializers.DefaultBinary))
+            // .Add(new PolymorphismForbiddenTypeTest(Serializers.DefaultBinary));
 
         var results = runner.RunAll();
 

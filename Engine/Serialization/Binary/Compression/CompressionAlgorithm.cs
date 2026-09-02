@@ -1,6 +1,6 @@
 ﻿namespace Engine.Serialization.Binary.Compression;
 
-public enum CompressionKind : byte
+public enum CompressionAlgorithm : byte
 {
     None = 0,
     Deflate = 1,

@@ -11,5 +11,6 @@ internal enum FieldKind
     Nullable,
     Array,
     List,
+    Dictionary,
     Nested
 }

@@ -2,9 +2,10 @@
 
 internal static class ChecksumResolver
 {
-    public static IIntegrityChecksum Resolve(ChecksumAlgorithm algorithm) => algorithm switch
+    public static IChecksumAlgorithm Resolve(ChecksumAlgorithm kind) => kind switch
     {
-        ChecksumAlgorithm.Crc32 => new Crc32Checksum(),
-        _ => throw new NotSupportedException($"Unknown checksum algorithm in file header: {algorithm}")
+        ChecksumAlgorithm.None => new NoChecksum(),
+        ChecksumAlgorithm.Crc32 => new Crc32(),
+        _ => throw new NotSupportedException($"Unknown checksum kind in file header: {kind}")
     };
 }

@@ -1,6 +1,6 @@
 ﻿namespace Engine.Serialization.Binary.Checksum;
 
-public sealed class Crc32Checksum : IIntegrityChecksum
+public sealed class Crc32 : IChecksumAlgorithm
 {
     public ChecksumAlgorithm Kind => ChecksumAlgorithm.Crc32;
     

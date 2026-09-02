@@ -2,8 +2,8 @@
 
 public interface ICompressor
 {
-    CompressionKind DefaultKind { get; }
+    CompressionAlgorithm DefaultKind { get; }
 
     byte[] Compress(byte[] rawPayload);
-    byte[] Decompress(CompressionKind kind, byte[] compressedPayload, int uncompressedLength);
+    byte[] Decompress(CompressionAlgorithm kind, byte[] compressedPayload, int uncompressedLength);
 }

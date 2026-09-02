@@ -2,5 +2,6 @@
 
 public enum ChecksumAlgorithm : byte
 {
-    Crc32 = 0,
+    None = 0,
+    Crc32 = 1,
 }

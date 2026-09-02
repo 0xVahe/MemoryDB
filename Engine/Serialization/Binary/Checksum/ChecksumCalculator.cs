@@ -1,8 +1,8 @@
 ﻿namespace Engine.Serialization.Binary.Checksum;
 
-public sealed class ChecksumProvider(IIntegrityChecksum defaultAlgorithm) : IChecksumProvider
+public sealed class ChecksumCalculator(IChecksumAlgorithm defaultAlgorithm) : IChecksumCalculator
 {
-    private readonly IIntegrityChecksum _defaultAlgorithm = defaultAlgorithm;
+    private readonly IChecksumAlgorithm _defaultAlgorithm = defaultAlgorithm;
 
     public ChecksumAlgorithm DefaultKind => _defaultAlgorithm.Kind;
 

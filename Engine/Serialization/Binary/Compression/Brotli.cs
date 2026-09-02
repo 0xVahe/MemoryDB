@@ -2,9 +2,9 @@
 
 namespace Engine.Serialization.Binary.Compression;
 
-public sealed class BrotliCompression(CompressionLevel level = CompressionLevel.Optimal) : ICompressionStrategy
+public sealed class Brotli(CompressionLevel level = CompressionLevel.Optimal) : ICompressionAlgorithm
 {
-    public CompressionKind Kind => CompressionKind.Brotli;
+    public CompressionAlgorithm Kind => CompressionAlgorithm.Brotli;
     public Stream Wrap(Stream destination) => new BrotliStream(destination, level, leaveOpen: true);
     public Stream Unwrap(Stream source) => new BrotliStream(source, CompressionMode.Decompress, leaveOpen: true);
 }

@@ -1,8 +1,8 @@
 ﻿namespace Engine.Serialization.Binary.Compression;
 
-public interface ICompressionStrategy
+public interface ICompressionAlgorithm
 {
-    CompressionKind Kind { get; }
+    CompressionAlgorithm Kind { get; }
     Stream Wrap(Stream destination);
     Stream Unwrap(Stream source);
 }

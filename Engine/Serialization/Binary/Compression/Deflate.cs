@@ -2,9 +2,9 @@
 
 namespace Engine.Serialization.Binary.Compression;
 
-public sealed class DeflateCompression(CompressionLevel level = CompressionLevel.Optimal) : ICompressionStrategy
+public sealed class Deflate(CompressionLevel level = CompressionLevel.Optimal) : ICompressionAlgorithm
 {
-    public CompressionKind Kind => CompressionKind.Deflate;
+    public CompressionAlgorithm Kind => CompressionAlgorithm.Deflate;
     public Stream Wrap(Stream destination) => new DeflateStream(destination, level, leaveOpen: true);
     public Stream Unwrap(Stream source) => new DeflateStream(source, CompressionMode.Decompress, leaveOpen: true);
 }

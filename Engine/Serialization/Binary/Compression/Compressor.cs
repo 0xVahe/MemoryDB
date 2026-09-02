@@ -1,14 +1,14 @@
 ﻿namespace Engine.Serialization.Binary.Compression;
 
-public sealed class Compressor(ICompressionStrategy defaultStrategy) : ICompressor
+public sealed class Compressor(ICompressionAlgorithm defaultStrategy) : ICompressor
 {
-    private readonly ICompressionStrategy _defaultStrategy = defaultStrategy;
+    private readonly ICompressionAlgorithm _defaultStrategy = defaultStrategy;
 
-    public CompressionKind DefaultKind => _defaultStrategy.Kind;
+    public CompressionAlgorithm DefaultKind => _defaultStrategy.Kind;
 
     public byte[] Compress(byte[] rawPayload)
     {
-        if (_defaultStrategy.Kind == CompressionKind.None) return rawPayload;
+        if (_defaultStrategy.Kind == CompressionAlgorithm.None) return rawPayload;
 
         using var output = new MemoryStream();
         using (var compressingStream = _defaultStrategy.Wrap(output))
@@ -17,11 +17,11 @@ public sealed class Compressor(ICompressionStrategy defaultStrategy) : ICompress
         return output.ToArray();
     }
 
-    public byte[] Decompress(CompressionKind kind, byte[] compressedPayload, int uncompressedLength)
+    public byte[] Decompress(CompressionAlgorithm kind, byte[] compressedPayload, int uncompressedLength)
     {
-        if (kind == CompressionKind.None) return compressedPayload;
+        if (kind == CompressionAlgorithm.None) return compressedPayload;
 
-        var strategy = CompressionStrategyResolver.Resolve(kind);
+        var strategy = CompressionResolver.Resolve(kind);
 
         using var input = new MemoryStream(compressedPayload);
         using var decompressingStream = strategy.Unwrap(input);

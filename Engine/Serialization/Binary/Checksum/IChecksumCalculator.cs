@@ -1,6 +1,6 @@
 ﻿namespace Engine.Serialization.Binary.Checksum;
 
-public interface IChecksumProvider
+public interface IChecksumCalculator
 {
     ChecksumAlgorithm DefaultKind { get; }
     

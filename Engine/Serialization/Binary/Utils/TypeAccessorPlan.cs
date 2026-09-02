@@ -3,5 +3,5 @@
 internal sealed class TypeAccessorPlan
 {
     public required Type Type { get; init; }
-    public required PropertyAccessor[] Properties { get; init; }
+    public required MemberAccessor[] Members { get; init; }
 }
