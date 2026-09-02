@@ -1,9 +1,9 @@
-﻿using System.Text;
+﻿using System.Security.Cryptography;
+using System.Text;
 using Engine.Serialization.Binary.Checksum;
 using Engine.Serialization.Binary.Compression;
 using Engine.Serialization.Binary.Encryption;
 using Engine.Serialization.Binary.Exceptions;
-using Engine.Serialization.Binary.Format;
 using Engine.Serialization.Binary.Metadata;
 
 namespace Engine.Serialization.Binary.Codec;
@@ -13,10 +13,6 @@ internal sealed class V1FormatCodec(
     IChecksumCalculator checksum,
     IEncryptor encryptor) : IFormatCodec
 {
-    private readonly ICompressor _compressor = compressor;
-    private readonly IChecksumCalculator _checksum = checksum;
-    private readonly IEncryptor _encryptor = encryptor;
-
     public int Version => 1;
 
     public void Serialize<T>(Stream destination, T data) where T : class
@@ -24,24 +20,18 @@ internal sealed class V1FormatCodec(
         ArgumentNullException.ThrowIfNull(destination);
 
         byte[] rawPayload = SerializePayload(data);
-        byte[] checksumBytes = _checksum.Compute(rawPayload);
-        byte[] compressedPayload = _compressor.Compress(rawPayload);
-        byte[] onDiskPayload = _encryptor.Encrypt(compressedPayload);
-
-        string? keyId = _encryptor.DefaultKind == EncryptionAlgorithm.None
-            ? null
-            : _encryptor.DefaultKeyId;
+        byte[] checksumBytes = checksum.Compute(rawPayload);
+        byte[] compressedPayload = compressor.Compress(rawPayload);
+        byte[] onDiskPayload = encryptor.Encrypt(compressedPayload);
 
         var header = new BinaryFormatHeaderV1(
-            FormatVersion: Version,
-            Compression: _compressor.DefaultKind,
-            ChecksumAlgorithm: _checksum.DefaultKind,
-            Encryption: _encryptor.DefaultKind,
-            KeyId: keyId,
-            UncompressedLength: rawPayload.Length,
-            CompressedLength: compressedPayload.Length,
-            OnDiskLength: onDiskPayload.Length,
-            Checksum: checksumBytes);
+            Version,
+            compressor.DefaultKind, compressor.DefaultCustomName,
+            checksum.DefaultKind, checksum.DefaultCustomName,
+            encryptor.DefaultKind, encryptor.DefaultCustomName,
+            encryptor.DefaultKeyId,
+            rawPayload.Length, compressedPayload.Length, onDiskPayload.Length,
+            checksumBytes);
 
         using var writer = new BinaryWriter(destination, Encoding.UTF8, leaveOpen: true);
         header.WriteTo(writer);
@@ -57,26 +47,29 @@ internal sealed class V1FormatCodec(
         var header = BinaryFormatHeaderV1.ReadFrom(reader);
 
         if (header.FormatVersion != Version)
-            throw new BinaryFormatValidationException(
-                $"Binary format version {header.FormatVersion} is not supported by V1 codec.");
+            throw new BinaryFormatNotSupportedException($"Binary format version {header.FormatVersion} is not supported by the V1 codec.");
 
         byte[] onDiskPayload = reader.ReadBytes(header.OnDiskLength);
         if (onDiskPayload.Length != header.OnDiskLength)
-            throw new BinaryFormatValidationException(
-                $"Payload ended early. Expected {header.OnDiskLength} bytes, got {onDiskPayload.Length}.");
+            throw new BinaryFormatException($"Payload ended early. Expected {header.OnDiskLength} bytes, got {onDiskPayload.Length}.");
+        
+        if (header.KeyId is not null && encryptor.DefaultKeyId is not null && header.KeyId != encryptor.DefaultKeyId)
+            throw new BinaryIntegrityException(
+                $"This data is marked as encrypted with key '{header.KeyId}', but the configured encryptor is set up for key '{encryptor.DefaultKeyId}'.");
 
-        byte[] compressedPayload = _encryptor.Decrypt(
-            header.Encryption,
-            header.KeyId,
-            onDiskPayload,
-            header.CompressedLength);
+        byte[] compressedPayload;
+        try
+        {
+            compressedPayload = encryptor.Decrypt(header.Encryption, header.CustomEncryptionName, onDiskPayload, header.CompressedLength);
+        }
+        catch (CryptographicException ex)
+        {
+            throw new BinaryIntegrityException("Decryption failed: wrong key or tampered payload.", ex);
+        }
 
-        byte[] rawPayload = _compressor.Decompress(
-            header.Compression,
-            compressedPayload,
-            header.UncompressedLength);
+        byte[] rawPayload = compressor.Decompress(header.Compression, header.CustomCompressionName, compressedPayload, header.UncompressedLength);
 
-        _checksum.Verify(header.ChecksumAlgorithm, rawPayload, header.Checksum);
+        checksum.Verify(header.ChecksumAlgorithm, header.CustomChecksumName, rawPayload, header.Checksum);
 
         return DeserializePayload<T>(rawPayload);
     }

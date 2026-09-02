@@ -16,7 +16,7 @@ internal sealed class TypeShape
     public static TypeShape Enum(Type underlyingType) => new() { Kind = FieldKind.Enum, UnderlyingType = underlyingType };
     public static TypeShape Nullable(Type underlyingType) => new() { Kind = FieldKind.Nullable, UnderlyingType = underlyingType };
     public static TypeShape Array(Type elementType) => new() { Kind = FieldKind.Array, ElementType = elementType };
-    public static TypeShape List(Type elementType) => new() { Kind = FieldKind.List, ElementType = elementType };
+    public static TypeShape Collection(Type elementType) => new() { Kind = FieldKind.Collection, ElementType = elementType };
     public static TypeShape Dictionary(Type keyType, Type valueType) => new() { Kind = FieldKind.Dictionary, KeyType = keyType, ValueType = valueType };
     public static TypeShape Nested() => new() { Kind = FieldKind.Nested };
 }

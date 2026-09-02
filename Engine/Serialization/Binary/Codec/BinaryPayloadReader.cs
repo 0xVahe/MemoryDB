@@ -1,5 +1,4 @@
-﻿using System.Collections;
-using Engine.Serialization.Binary.Cache;
+﻿using Engine.Serialization.Binary.Cache;
 using Engine.Serialization.Binary.Exceptions;
 using Engine.Serialization.Binary.Utils;
 
@@ -12,42 +11,49 @@ internal sealed class BinaryPayloadReader(BinaryReader reader)
     private object? ReadValue(Type declaredType)
     {
         bool canBeNull = !declaredType.IsValueType || Nullable.GetUnderlyingType(declaredType) != null;
-
-        if (canBeNull) 
+        if (canBeNull)
         {
             bool hasValue = reader.ReadBoolean();
             if (!hasValue) return null;
         }
-        
+
         var polymorphicMap = PolymorphicTypeCache.GetMap(declaredType);
         if (polymorphicMap is not null)
         {
-            int discriminator = reader.ReadInt32();
+            byte discriminator = reader.ReadByte();
             if (!polymorphicMap.TryGetType(discriminator, out var runtimeType) || runtimeType is null)
-                throw new BinaryFormatValidationException($"Unknown discriminator '{discriminator}' for declared type '{declaredType}'.");
+                throw new BinaryTypeException(
+                    $"Unknown discriminator '{discriminator}' for declared type '{declaredType}' — the data may be from an incompatible version.");
 
             return ReadNested(runtimeType);
         }
-        
+
         var shape = FieldKindClassifier.Classify(declaredType);
-        
+
         return shape.Kind switch
         {
             FieldKind.String => reader.ReadString(),
-            FieldKind.Guid => new Guid(reader.ReadBytes(16)),
+            FieldKind.Guid => ReadGuid(),
             FieldKind.DateTime => DateTime.FromBinary(reader.ReadInt64()),
             FieldKind.TimeSpan => TimeSpan.FromTicks(reader.ReadInt64()),
             FieldKind.Enum => Enum.ToObject(declaredType, ReadPrimitive(shape.UnderlyingType!)),
             FieldKind.Nullable => ReadValue(shape.UnderlyingType!),
             FieldKind.Primitive => ReadPrimitive(declaredType),
-            FieldKind.Array => ReadCollection(isArray: true, shape.ElementType!),
-            FieldKind.List => ReadCollection(isArray: false, shape.ElementType!),
+            FieldKind.Array => ReadArray(shape.ElementType!),
+            FieldKind.Collection => ReadCollection(declaredType, shape.ElementType!),
             FieldKind.Dictionary => ReadDictionary(shape.KeyType!, shape.ValueType!),
             FieldKind.Nested => ReadNested(declaredType),
-            _ => throw new NotSupportedException($"Type '{declaredType}' is not supported.")
+            _ => throw new BinaryTypeException($"Type '{declaredType}' is not supported.")
         };
     }
 
+    private Guid ReadGuid()
+    {
+        Span<byte> bytes = stackalloc byte[16];
+        reader.ReadExactly(bytes);
+        return new Guid(bytes);
+    }
+    
     private object ReadPrimitive(Type type)
     {
         if (type == typeof(bool)) return reader.ReadBoolean();
@@ -64,36 +70,30 @@ internal sealed class BinaryPayloadReader(BinaryReader reader)
         if (type == typeof(decimal)) return reader.ReadDecimal();
         if (type == typeof(char)) return reader.ReadChar();
 
-        throw new NotSupportedException($"Unsupported primitive type: {type}");
+        throw new BinaryTypeException($"Unsupported primitive type: {type}");
     }
 
-    private object ReadCollection(bool isArray, Type elementType)
+    private Array ReadArray(Type elementType)
     {
         int count = reader.ReadInt32();
-        
-        if (isArray)
-            return ReadArray(elementType, count);
-
-        return ReadList(elementType, count);
-    }
-
-    private Array ReadArray(Type elementType, int count)
-    {
         var array = Array.CreateInstance(elementType, count);
         for (int i = 0; i < count; i++)
             array.SetValue(ReadValue(elementType), i);
         return array;
     }
-    
-    private object ReadList(Type elementType, int count)
+
+    private object ReadCollection(Type declaredType, Type elementType)
     {
-        var listType = typeof(List<>).MakeGenericType(elementType);
-        var list = (IList)Activator.CreateInstance(listType)!;
+        int count = reader.ReadInt32();
+        var accessors = CollectionAccessorCache.GetAccessors(declaredType, elementType);
+        var instance = accessors.CreateInstance();
+
         for (int i = 0; i < count; i++)
-            list.Add(ReadValue(elementType));
-        return list;
+            accessors.Add(instance, ReadValue(elementType));
+
+        return instance;
     }
-    
+
     private object ReadDictionary(Type keyType, Type valueType)
     {
         int count = reader.ReadInt32();
@@ -110,7 +110,7 @@ internal sealed class BinaryPayloadReader(BinaryReader reader)
 
         return dict;
     }
-    
+
     private object ReadNested(Type type)
     {
         var instance = Activator.CreateInstance(type)!;

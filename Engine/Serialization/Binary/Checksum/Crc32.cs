@@ -2,11 +2,12 @@
 
 public sealed class Crc32 : IChecksumAlgorithm
 {
-    public ChecksumAlgorithm Kind => ChecksumAlgorithm.Crc32;
-    
     private const uint Polynomial = 0xEDB88320;
     private static readonly uint[] Table = BuildTable();
-    
+
+    public ChecksumAlgorithm Kind => ChecksumAlgorithm.Crc32;
+    public string? CustomName => null;
+
     public byte[] Compute(ReadOnlySpan<byte> data)
     {
         uint crc = 0xFFFFFFFF;

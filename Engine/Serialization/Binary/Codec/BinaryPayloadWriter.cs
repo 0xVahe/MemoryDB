@@ -1,5 +1,6 @@
 ﻿using System.Collections;
 using Engine.Serialization.Binary.Cache;
+using Engine.Serialization.Binary.Exceptions;
 using Engine.Serialization.Binary.Utils;
 
 namespace Engine.Serialization.Binary.Codec;
@@ -19,21 +20,19 @@ internal sealed class BinaryPayloadWriter(BinaryWriter writer)
         
         if (value is not { } nonNullValue) 
             return;
-        
+
         var polymorphicMap = PolymorphicTypeCache.GetMap(declaredType);
         if (polymorphicMap is not null)
         {
             var runtimeType = nonNullValue.GetType();
-            if (!polymorphicMap.TryGetDiscriminator(runtimeType, out int discriminator))
-                throw new InvalidDataException($"Runtime type '{runtimeType}' is not allowed for declared type '{declaredType}'.");
+            if (!polymorphicMap.TryGetDiscriminator(runtimeType, out byte discriminator))
+                throw new BinaryTypeException(
+                    $"Runtime type '{runtimeType}' is not allowed for declared type '{declaredType}' — " +
+                    $"add [BinaryKnownType(typeof({runtimeType.Name}))] on '{declaredType.Name}'.");
 
             writer.Write(discriminator);
-
-            if (runtimeType != declaredType)
-            {
-                WriteNested(nonNullValue);
-                return;
-            }
+            WriteNested(value);
+            return;
         }
 
         var shape = FieldKindClassifier.Classify(declaredType);
@@ -44,7 +43,9 @@ internal sealed class BinaryPayloadWriter(BinaryWriter writer)
                 writer.Write((string)nonNullValue);
                 break;
             case FieldKind.Guid:
-                writer.Write(((Guid)nonNullValue).ToByteArray());
+                Span<byte> guidSpan = stackalloc byte[16];
+                ((Guid)nonNullValue).TryWriteBytes(guidSpan);
+                writer.Write(guidSpan);
                 break;
             case FieldKind.DateTime:
                 writer.Write(((DateTime)nonNullValue).ToBinary());
@@ -59,20 +60,20 @@ internal sealed class BinaryPayloadWriter(BinaryWriter writer)
                 WriteValue(value, shape.UnderlyingType!);
                 break;
             case FieldKind.Primitive:
-                WritePrimitive(value);
+                WritePrimitive(nonNullValue);
                 break;
             case FieldKind.Array:
-            case FieldKind.List:
-                WriteCollection((IEnumerable)value, shape.ElementType!);
+            case FieldKind.Collection:
+                WriteCollection((IEnumerable)nonNullValue, shape.ElementType!);
                 break;
             case FieldKind.Dictionary:
-                WriteDictionary((IEnumerable)value, shape.KeyType!, shape.ValueType!);
+                WriteDictionary((IEnumerable)nonNullValue, shape.KeyType!, shape.ValueType!);
                 break;
             case FieldKind.Nested:
-                WriteNested(value);
+                WriteNested(nonNullValue);
                 break;
             default:
-                throw new NotSupportedException($"Type '{declaredType}' is not supported.");
+                throw new BinaryTypeException($"Type '{declaredType}' is not supported.");
         }
     }
 
@@ -94,18 +95,22 @@ internal sealed class BinaryPayloadWriter(BinaryWriter writer)
             case decimal v: writer.Write(v); break;
             case char v: writer.Write(v); break;
             default:
-                throw new NotSupportedException($"Unsupported primitive type: {value.GetType()}");
+                throw new BinaryTypeException($"Unsupported primitive type: {value.GetType()}");
         }
     }
 
     private void WriteCollection(IEnumerable value, Type elementType)
     {
         var items = value.Cast<object>().ToList();
+        
+        if (CollectionAccessorCache.ReverseOnWrite(value.GetType()))
+            items.Reverse();
+
         writer.Write(items.Count);
         foreach (var item in items)
             WriteValue(item, elementType);
     }
-    
+
     private void WriteDictionary(IEnumerable dictionaryEntries, Type keyType, Type valueType)
     {
         var entries = dictionaryEntries.Cast<object>().ToList();

@@ -1,30 +1,35 @@
-﻿namespace Engine.Serialization.Binary.Compression;
+﻿using Engine.Serialization.Binary.Exceptions;
 
-public sealed class Compressor(ICompressionAlgorithm defaultStrategy) : ICompressor
+namespace Engine.Serialization.Binary.Compression;
+
+public sealed class Compressor(ICompressionAlgorithm defaultAlgorithm) : ICompressor
 {
-    private readonly ICompressionAlgorithm _defaultStrategy = defaultStrategy;
+    private readonly ICompressionAlgorithm _defaultAlgorithm = defaultAlgorithm;
 
-    public CompressionAlgorithm DefaultKind => _defaultStrategy.Kind;
+    public CompressionAlgorithm DefaultKind => _defaultAlgorithm.Kind;
+    public string? DefaultCustomName => _defaultAlgorithm.CustomName;
 
+    public static Compressor None() => new(new NoCompression());
+    
     public byte[] Compress(byte[] rawPayload)
     {
-        if (_defaultStrategy.Kind == CompressionAlgorithm.None) return rawPayload;
+        if (_defaultAlgorithm.Kind == CompressionAlgorithm.None) return rawPayload;
 
         using var output = new MemoryStream();
-        using (var compressingStream = _defaultStrategy.Wrap(output))
+        using (var compressingStream = _defaultAlgorithm.Wrap(output))
             compressingStream.Write(rawPayload, 0, rawPayload.Length);
 
         return output.ToArray();
     }
 
-    public byte[] Decompress(CompressionAlgorithm kind, byte[] compressedPayload, int uncompressedLength)
+    public byte[] Decompress(CompressionAlgorithm kind, string? customName, byte[] compressedPayload, int uncompressedLength)
     {
         if (kind == CompressionAlgorithm.None) return compressedPayload;
 
-        var strategy = CompressionResolver.Resolve(kind);
+        var algorithm = CompressionAlgorithmRegistry.Resolve(kind, customName);
 
         using var input = new MemoryStream(compressedPayload);
-        using var decompressingStream = strategy.Unwrap(input);
+        using var decompressingStream = algorithm.Unwrap(input);
 
         var output = new byte[uncompressedLength];
         int totalRead = 0;
@@ -37,8 +42,7 @@ public sealed class Compressor(ICompressionAlgorithm defaultStrategy) : ICompres
         }
 
         if (totalRead != uncompressedLength)
-            throw new InvalidDataException(
-                $"Decompression ended early. Expected {uncompressedLength} bytes, got {totalRead}.");
+            throw new BinaryFormatException($"Decompression ended early. Expected {uncompressedLength} bytes, got {totalRead}.");
 
         return output;
     }

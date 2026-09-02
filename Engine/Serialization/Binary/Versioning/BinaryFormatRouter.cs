@@ -11,25 +11,34 @@ internal sealed class BinaryFormatRouter(IEnumerable<IFormatCodec> codecs)
     public void Serialize<T>(Stream destination, T data, int version) where T : class
     {
         if (!_byVersion.TryGetValue(version, out var codec))
-            throw new BinaryFormatValidationException($"No codec registered for version {version}.");
+            throw new BinaryFormatNotSupportedException($"No codec registered for version {version}.");
 
         codec.Serialize(destination, data);
     }
 
     public T? Deserialize<T>(Stream source) where T : class
     {
-        long p = source.Position;
-        using var reader = new BinaryReader(source, System.Text.Encoding.UTF8, leaveOpen: true);
+        ArgumentNullException.ThrowIfNull(source);
 
-        int magic = reader.ReadInt32();
-        int version = reader.ReadInt32();
-        source.Position = p;
+        if (!source.CanSeek)
+            throw new NotSupportedException($"{nameof(BinaryFormatRouter)} needs a seekable stream to detect the format version.");
 
-        if (magic != BinaryFormatConstants.Magic)
-            throw new BinaryFormatValidationException("Magic mismatch.");
+        int version;
+
+        if (BinaryHeaderPeek.TryPeekMagicAndVersion(source, out int detectedVersion))
+        {
+            version = detectedVersion;
+        }
+        else
+        {
+            if (_byVersion.ContainsKey(0))
+                version = 0;
+            else
+                throw new BinaryFormatException("Not a recognized BinarySerializer stream (magic number mismatch and V0 fallback is disabled).");
+        }
 
         if (!_byVersion.TryGetValue(version, out var codec))
-            throw new BinaryFormatValidationException($"No codec registered for version {version}.");
+            throw new BinaryFormatNotSupportedException($"No codec registered for version {version}.");
 
         return codec.Deserialize<T>(source);
     }

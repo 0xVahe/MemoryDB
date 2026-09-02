@@ -3,7 +3,7 @@
 public interface IChecksumCalculator
 {
     ChecksumAlgorithm DefaultKind { get; }
-    
+    string? DefaultCustomName { get; }
     byte[] Compute(byte[] rawPayload);
-    void Verify(ChecksumAlgorithm kind, byte[] rawPayload, byte[] expectedChecksum);
+    void Verify(ChecksumAlgorithm kind, string? customName, byte[] rawPayload, byte[] expectedChecksum);
 }

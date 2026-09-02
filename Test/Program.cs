@@ -1,4 +1,6 @@
-﻿using Engine.Serialization.Binary.Compression;
+﻿using Engine.Serialization.Binary.Checksum;
+using Engine.Serialization.Binary.Compression;
+using Engine.Serialization.Binary.Encryption;
 using Test.Infrastructure;
 using Test.Tests;
 
@@ -14,6 +16,7 @@ class Program
             .Add(new SerializerTest(Serializers.DefaultBinary))
             .Add(new SerializerTest(Serializers.Binary(new Brotli())))
             .Add(new SerializerTest(Serializers.Binary(new Deflate())))
+            .Add(new SerializerTest(Serializers.Binary(new Deflate(), new Crc32(), new Aes256Gcm())))
             .Add(new SerializerTest(Serializers.V0Binary))
             .Add(new SerializerTest(Serializers.Json))
             .Add(new SerializerTest(Serializers.Xml));

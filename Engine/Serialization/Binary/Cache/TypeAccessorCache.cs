@@ -1,6 +1,7 @@
-﻿using System.Linq.Expressions;
+﻿using System.Collections.Concurrent;
+using System.Linq.Expressions;
 using System.Reflection;
-using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
 using Engine.Serialization.Binary.Attributes;
 using Engine.Serialization.Binary.Utils;
 
@@ -8,32 +9,30 @@ namespace Engine.Serialization.Binary.Cache;
 
 internal static class TypeAccessorCache
 {
-    private static readonly ConcurrentDictionary<Type, TypeAccessorPlan> Cache = [];
+    private static readonly ConcurrentDictionary<Type, TypeAccessorPlan> Cache = new();
 
-    public static TypeAccessorPlan GetOrBuild(Type type)
-    {
-        if (Cache.TryGetValue(type, out var plan)) return plan;
-
-        plan = BuildPlan(type);
-        Cache[type] = plan;
-        return plan;
-    }
+    public static TypeAccessorPlan GetOrBuild(Type type) => Cache.GetOrAdd(type, BuildPlan);
 
     private static TypeAccessorPlan BuildPlan(Type type)
     {
         var propertyMembers = type
-            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
             .Where(p => p.CanRead && p.CanWrite && p.GetIndexParameters().Length == 0)
+            .Where(p => !typeof(Delegate).IsAssignableFrom(p.PropertyType))
             .Where(p => p.GetCustomAttribute<BinaryIgnoreAttribute>() is null)
+            .Where(IsIncluded)
             .Select(p => new MemberSource(
                 p.Name,
                 p.GetCustomAttribute<BinaryOrderAttribute>()?.Order ?? int.MaxValue,
                 BuildAccessor(p)));
 
         var fieldMembers = type
-            .GetFields(BindingFlags.Public | BindingFlags.Instance)
-            .Where(f => !f.IsStatic)
+            .GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+            .Where(f => !f.IsInitOnly)
+            .Where(f => !typeof(Delegate).IsAssignableFrom(f.FieldType))
+            .Where(f => f.GetCustomAttribute<CompilerGeneratedAttribute>() is null)
             .Where(f => f.GetCustomAttribute<BinaryIgnoreAttribute>() is null)
+            .Where(IsIncluded)
             .Select(f => new MemberSource(
                 f.Name,
                 f.GetCustomAttribute<BinaryOrderAttribute>()?.Order ?? int.MaxValue,
@@ -46,12 +45,14 @@ internal static class TypeAccessorCache
             .Select(m => m.Accessor)
             .ToArray();
 
-        return new TypeAccessorPlan
-        {
-            Type = type,
-            Members = members
-        };
+        return new TypeAccessorPlan { Type = type, Members = members };
     }
+
+    private static bool IsIncluded(PropertyInfo p) =>
+        p.GetMethod is { IsPublic: true } || p.GetCustomAttribute<BinaryIncludeAttribute>() is not null;
+
+    private static bool IsIncluded(FieldInfo f) =>
+        f.IsPublic || f.GetCustomAttribute<BinaryIncludeAttribute>() is not null;
 
     private static MemberAccessor BuildAccessor(PropertyInfo property)
     {
@@ -103,7 +104,6 @@ internal static class TypeAccessorCache
     {
         var instanceParam = Expression.Parameter(typeof(object), "instance");
         var valueParam = Expression.Parameter(typeof(object), "value");
-
         var typedInstance = Expression.Convert(instanceParam, property.DeclaringType!);
         var typedValue = Expression.Convert(valueParam, property.PropertyType);
         var propertyAccess = Expression.Property(typedInstance, property);
@@ -126,7 +126,6 @@ internal static class TypeAccessorCache
     {
         var instanceParam = Expression.Parameter(typeof(object), "instance");
         var valueParam = Expression.Parameter(typeof(object), "value");
-
         var typedInstance = Expression.Convert(instanceParam, field.DeclaringType!);
         var typedValue = Expression.Convert(valueParam, field.FieldType);
         var fieldAccess = Expression.Field(typedInstance, field);

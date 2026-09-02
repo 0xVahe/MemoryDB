@@ -1,10 +1,13 @@
 ﻿using System.Collections.Concurrent;
 using Engine.Serialization.Binary.Attributes;
+using Engine.Serialization.Binary.Exceptions;
 
 namespace Engine.Serialization.Binary.Cache;
 
 internal static class PolymorphicTypeCache
 {
+    private const int MaxKnownTypes = 256;
+
     private static readonly ConcurrentDictionary<Type, PolymorphicMap?> Cache = new();
 
     public static PolymorphicMap? GetMap(Type declaredType) => Cache.GetOrAdd(declaredType, BuildMap);
@@ -19,20 +22,22 @@ internal static class PolymorphicTypeCache
 
         var knownTypes = attrs.Select(a => a.DerivedType).Distinct().ToArray();
 
+        if (knownTypes.Length > MaxKnownTypes)
+            throw new BinaryTypeException($"'{declaredType}' has {knownTypes.Length} [BinaryKnownType] entries — the byte discriminator supports at most {MaxKnownTypes}.");
+
         foreach (var t in knownTypes)
         {
             if (!declaredType.IsAssignableFrom(t))
-                throw new InvalidOperationException($"Known type '{t}' is not assignable to '{declaredType}'.");
+                throw new BinaryTypeException($"Known type '{t}' is not assignable to '{declaredType}'.");
         }
+        
+        var byType = new Dictionary<Type, byte>();
+        var byId = new Dictionary<byte, Type>();
 
-        var byType = new Dictionary<Type, int>();
-        var byId = new Dictionary<int, Type>();
-
-        for (int i = 0; i < knownTypes.Length; i++)
+        for (byte id = 0; id < knownTypes.Length; id++)
         {
-            int id = i + 1;
-            byType[knownTypes[i]] = id;
-            byId[id] = knownTypes[i];
+            byType[knownTypes[id]] = id;
+            byId[id] = knownTypes[id];
         }
 
         return new PolymorphicMap(byType, byId);
@@ -40,13 +45,13 @@ internal static class PolymorphicTypeCache
 }
 
 internal sealed class PolymorphicMap(
-    IReadOnlyDictionary<Type, int> discriminatorByType,
-    IReadOnlyDictionary<int, Type> typeByDiscriminator)
+    IReadOnlyDictionary<Type, byte> discriminatorByType,
+    IReadOnlyDictionary<byte, Type> typeByDiscriminator)
 {
-    public bool TryGetDiscriminator(Type runtimeType, out int discriminator) =>
+    public bool TryGetDiscriminator(Type runtimeType, out byte discriminator) =>
         discriminatorByType.TryGetValue(runtimeType, out discriminator);
 
-    public bool TryGetType(int discriminator, out Type? runtimeType)
+    public bool TryGetType(byte discriminator, out Type? runtimeType)
     {
         var ok = typeByDiscriminator.TryGetValue(discriminator, out var t);
         runtimeType = t;

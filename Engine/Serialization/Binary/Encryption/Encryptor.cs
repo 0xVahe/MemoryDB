@@ -1,46 +1,23 @@
-﻿using Engine.Serialization.Binary.Exceptions;
+﻿namespace Engine.Serialization.Binary.Encryption;
 
-namespace Engine.Serialization.Binary.Encryption;
-
-public sealed class Encryptor(
-    IEncryptionAlgorithm defaultStrategy,
-    IKeyResolver? keyResolver,
-    string? defaultKeyId) : IEncryptor
+public sealed class Encryptor(IEncryptionAlgorithm defaultAlgorithm, byte[]? key = null, string? keyId = null) : IEncryptor
 {
-    private readonly IEncryptionAlgorithm _defaultStrategy = defaultStrategy;
-    private readonly IKeyResolver? _keyResolver = keyResolver;
+    private readonly IEncryptionAlgorithm _defaultAlgorithm = defaultAlgorithm;
+    private readonly byte[] _key = key ?? [];
 
-    public EncryptionAlgorithm DefaultKind => _defaultStrategy.Kind;
-    public string DefaultKeyId { get; } = defaultKeyId ?? string.Empty;
+    public EncryptionAlgorithm DefaultKind => _defaultAlgorithm.Kind;
+    public string? DefaultCustomName => _defaultAlgorithm.CustomName;
+    public string? DefaultKeyId { get; } = keyId;
 
-    public static Encryptor None() => new(new NoEncryption(), keyResolver: null, defaultKeyId: null);
+    public static Encryptor None() => new(new NoEncryption());
 
-    public byte[] Encrypt(byte[] plaintext)
-    {
-        if (DefaultKind == EncryptionAlgorithm.None) return plaintext;
+    public byte[] Encrypt(byte[] plaintext) => _defaultAlgorithm.Encrypt(plaintext, _key);
 
-        if (_keyResolver is null)
-            throw new BinaryFormatValidationException("Key resolver is not configured.");
-
-        if (string.IsNullOrWhiteSpace(DefaultKeyId))
-            throw new BinaryFormatValidationException("DefaultKeyId is required when encryption is enabled.");
-
-        var key = _keyResolver.Resolve(DefaultKeyId);
-        return _defaultStrategy.Encrypt(plaintext, key);
-    }
-
-    public byte[] Decrypt(EncryptionAlgorithm kind, string? keyId, byte[] ciphertext, int expectedPlaintextLength)
+    public byte[] Decrypt(EncryptionAlgorithm kind, string? customName, byte[] ciphertext, int expectedPlaintextLength)
     {
         if (kind == EncryptionAlgorithm.None) return ciphertext;
 
-        if (_keyResolver is null)
-            throw new BinaryFormatValidationException("Key resolver is not configured.");
-
-        if (string.IsNullOrWhiteSpace(keyId))
-            throw new BinaryFormatValidationException("Encrypted payload requires key id in header.");
-
-        var strategy = EncryptionResolver.Resolve(kind);
-        var key = _keyResolver.Resolve(keyId);
-        return strategy.Decrypt(ciphertext, key, expectedPlaintextLength);
+        var algorithm = EncryptionAlgorithmRegistry.Resolve(kind, customName);
+        return algorithm.Decrypt(ciphertext, _key, expectedPlaintextLength);
     }
 }

@@ -3,13 +3,9 @@ namespace Engine.Serialization.Binary.Encryption;
 public interface IEncryptor
 {
     EncryptionAlgorithm DefaultKind { get; }
-    string DefaultKeyId { get; }
+    string? DefaultCustomName { get; }
+    string? DefaultKeyId { get; }
 
     byte[] Encrypt(byte[] plaintext);
-
-    byte[] Decrypt(
-        EncryptionAlgorithm kind,
-        string? keyId,
-        byte[] ciphertext,
-        int expectedPlaintextLength);
+    byte[] Decrypt(EncryptionAlgorithm kind, string? customName, byte[] ciphertext, int expectedPlaintextLength);
 }

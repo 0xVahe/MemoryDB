@@ -1,5 +1,6 @@
 ﻿using System.Collections.Concurrent;
 using System.Linq.Expressions;
+using Engine.Serialization.Binary.Exceptions;
 
 namespace Engine.Serialization.Binary.Cache;
 
@@ -17,10 +18,10 @@ internal static class DictionaryAccessorCache
     private static EntryAccessors BuildEntryAccessors(Type entryType)
     {
         var keyProp = entryType.GetProperty("Key")
-            ?? throw new InvalidOperationException($"Dictionary entry type '{entryType}' does not expose Key.");
+            ?? throw new BinaryTypeException($"Dictionary entry type '{entryType}' does not expose Key.");
 
         var valueProp = entryType.GetProperty("Value")
-            ?? throw new InvalidOperationException($"Dictionary entry type '{entryType}' does not expose Value.");
+            ?? throw new BinaryTypeException($"Dictionary entry type '{entryType}' does not expose Value.");
 
         var entryParam = Expression.Parameter(typeof(object), "entry");
         var typedEntry = Expression.Convert(entryParam, entryType);
@@ -49,7 +50,7 @@ internal static class DictionaryAccessorCache
         var typedValue = Expression.Convert(valueParam, valueType);
 
         var addMethod = dictType.GetMethod("Add", [keyType, valueType])
-            ?? throw new MissingMethodException($"Method Add({keyType.Name}, {valueType.Name}) was not found on {dictType}.");
+            ?? throw new BinaryTypeException($"Method Add({keyType.Name}, {valueType.Name}) was not found on {dictType}.");
 
         var call = Expression.Call(typedDict, addMethod, typedKey, typedValue);
         var add = Expression.Lambda<Action<object, object?, object?>>(call, dictParam, keyParam, valueParam).Compile();

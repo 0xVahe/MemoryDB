@@ -10,7 +10,7 @@ internal enum FieldKind
     Enum,
     Nullable,
     Array,
-    List,
+    Collection,
     Dictionary,
     Nested
 }

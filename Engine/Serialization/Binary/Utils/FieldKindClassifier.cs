@@ -17,8 +17,7 @@ internal static class FieldKindClassifier
         if (type.IsEnum) return TypeShape.Enum(Enum.GetUnderlyingType(type));
         if (type.IsPrimitive || type == typeof(decimal)) return TypeShape.Primitive();
 
-        if (type.IsArray)
-            return TypeShape.Array(type.GetElementType()!);
+        if (type.IsArray) return TypeShape.Array(type.GetElementType()!);
 
         if (TryGetDictionaryTypes(type, out var keyType, out var valueType))
             return TypeShape.Dictionary(keyType!, valueType!);
@@ -26,7 +25,7 @@ internal static class FieldKindClassifier
         if (type.IsGenericType && typeof(IEnumerable).IsAssignableFrom(type))
         {
             var elementType = type.GetGenericArguments().FirstOrDefault() ?? typeof(object);
-            return TypeShape.List(elementType);
+            return TypeShape.Collection(elementType);
         }
 
         return TypeShape.Nested();
