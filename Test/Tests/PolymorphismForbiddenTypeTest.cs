@@ -1,4 +1,5 @@
 ﻿using Core;
+using Engine.Serialization.Binary.Exceptions;
 using Test.Infrastructure;
 using Test.Models;
 
@@ -32,9 +33,9 @@ public sealed class PolymorphismForbiddenTypeTest(string name, string extension,
             Serializer.Serialize(sourceData);
             return Fail("Serialization should fail for a forbidden runtime type, but it succeeded.", startedUtc, logs);
         }
-        catch (InvalidDataException ex)
+        catch (BinaryTypeException ex) 
         {
-            logs.Add($"Expected failure: {ex.Message}");
+            logs.Add($"Expected failure captured successfully: {ex.Message}");
 
             var report = new TestExecutionReport(
                 Name,
