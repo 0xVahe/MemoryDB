@@ -1,4 +1,4 @@
-﻿using Engine.Serialization.Binary.Codec;
+﻿using Engine.Serialization.Binary.Format;
 using Engine.Serialization.Binary.Versioning;
 
 namespace Engine.Serialization.Binary;
@@ -11,17 +11,8 @@ public sealed class BinarySerializer
     public BinarySerializer(BinarySerializerOptions? options = null)
     {
         _options = options ?? BinarySerializerOptions.Default;
-
-        var v1 = new V1FormatCodec(
-            _options.Compressor,
-            _options.Checksum,
-            _options.Encryptor);
-
-        var codecs = new List<IFormatCodec> { v1 };
-
-        if (_options.AllowV0Fallback)
-            codecs.Add(new V0FormatCodec());
         
+        var codecs = CodecRegistry.CreateCodecs(_options);
         _router = new BinaryFormatRouter(codecs);
     }
 

@@ -25,7 +25,6 @@ internal sealed class V1FormatCodec(
         byte[] onDiskPayload = encryptor.Encrypt(compressedPayload);
 
         var header = new BinaryFormatHeaderV1(
-            Version,
             compressor.DefaultKind, compressor.DefaultCustomName,
             checksum.DefaultKind, checksum.DefaultCustomName,
             encryptor.DefaultKind, encryptor.DefaultCustomName,
@@ -45,9 +44,6 @@ internal sealed class V1FormatCodec(
 
         using var reader = new BinaryReader(source, Encoding.UTF8, leaveOpen: true);
         var header = BinaryFormatHeaderV1.ReadFrom(reader);
-
-        if (header.FormatVersion != Version)
-            throw new BinaryFormatNotSupportedException($"Binary format version {header.FormatVersion} is not supported by the V1 codec.");
 
         byte[] onDiskPayload = reader.ReadBytes(header.OnDiskLength);
         if (onDiskPayload.Length != header.OnDiskLength)

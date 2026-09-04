@@ -1,0 +1,44 @@
+﻿using Engine.Serialization.Binary.Format;
+using Engine.Serialization.Binary.Checksum;
+using Engine.Serialization.Binary.Compression;
+using Engine.Serialization.Binary.Encryption;
+using Engine.Serialization.Binary.Metadata;
+using Engine.Serialization.Binary.Configuration;
+
+namespace Engine.Serialization.Binary;
+
+public sealed record BinarySerializerOptions
+{
+    public static BinarySerializerOptions Default { get; } = new();
+    
+    public static BinarySerializerOptionsBuilder Configure() => new();
+
+    public ICompressor Compressor { get; init; } = Compression.Compressor.None();
+    public IChecksumCalculator Checksum { get; init; } = ChecksumCalculator.None();
+    public IEncryptor Encryptor { get; init; } = Encryption.Encryptor.None();
+    public int WriteVersion { get; init; } = BinaryFormatConstants.LatestVersion;
+    public bool AllowV0Fallback { get; init; } = false;
+    
+    public static BinarySerializerOptions FromHeader(BinaryHeaderInfo info, byte[]? key = null)
+    {
+        return new BinarySerializerOptions
+        {
+            Compressor = AlgorithmResolver.ResolveCompressor(info.Compression, info.CustomCompressionName),
+            Checksum = AlgorithmResolver.ResolveChecksum(info.ChecksumAlgorithm, info.CustomChecksumName),
+            Encryptor = AlgorithmResolver.ResolveEncryptor(info.Encryption, info.CustomEncryptionName, key, info.KeyId)
+        };
+    }
+    
+    public static BinarySerializerOptions FromHeader(
+        BinaryHeaderInfo info, 
+        Func<string?, byte[]?>? keyResolver)
+    {
+        byte[]? key = null;
+        if (info.Encryption != EncryptionAlgorithm.None && keyResolver != null)
+        {
+            key = keyResolver(info.KeyId);
+        }
+
+        return FromHeader(info, key);
+    }
+}

@@ -2,12 +2,12 @@
 using Engine.Serialization.Binary.Compression;
 using Engine.Serialization.Binary.Encryption;
 using Engine.Serialization.Binary.Exceptions;
+using Engine.Serialization.Binary.Extensions;
 using Engine.Serialization.Binary.Format;
 
 namespace Engine.Serialization.Binary.Metadata;
 
 internal readonly record struct BinaryFormatHeaderV1(
-    int FormatVersion,
     CompressionAlgorithm Compression,
     string? CustomCompressionName,
     ChecksumAlgorithm ChecksumAlgorithm,
@@ -20,23 +20,25 @@ internal readonly record struct BinaryFormatHeaderV1(
     int OnDiskLength,
     byte[] Checksum)
 {
+    public const int Version = 1;
+
     public void WriteTo(BinaryWriter writer)
     {
         ArgumentNullException.ThrowIfNull(writer);
 
         writer.Write(BinaryFormatConstants.Magic);
-        writer.Write(FormatVersion);
-
+        writer.Write(Version);
+        
         writer.Write((byte)Compression);
-        WriteOptionalString(writer, Compression == CompressionAlgorithm.Custom ? CustomCompressionName : null);
+        writer.WriteOptionalString(CustomCompressionName);
 
         writer.Write((byte)ChecksumAlgorithm);
-        WriteOptionalString(writer, ChecksumAlgorithm == ChecksumAlgorithm.Custom ? CustomChecksumName : null);
+        writer.WriteOptionalString(CustomChecksumName);
 
         writer.Write((byte)Encryption);
-        WriteOptionalString(writer, Encryption == EncryptionAlgorithm.Custom ? CustomEncryptionName : null);
+        writer.WriteOptionalString(CustomEncryptionName);
 
-        WriteOptionalString(writer, KeyId);
+        writer.WriteOptionalString(KeyId);
 
         writer.Write(UncompressedLength);
         writer.Write(CompressedLength);
@@ -55,23 +57,25 @@ internal readonly record struct BinaryFormatHeaderV1(
             throw new BinaryFormatException("Not a recognized BinarySerializer stream (magic number mismatch).");
 
         int formatVersion = reader.ReadInt32();
+        if (formatVersion != Version)
+            throw new BinaryFormatException($"Expected format version {Version}, but found {formatVersion}.");
 
         var compression = (CompressionAlgorithm)reader.ReadByte();
         if (!Enum.IsDefined(compression))
             throw new BinaryFormatNotSupportedException($"Unknown compression algorithm: {compression}.");
-        string? customCompressionName = ReadOptionalString(reader);
+        var customCompression = reader.ReadOptionalString();
 
         var checksumAlgorithm = (ChecksumAlgorithm)reader.ReadByte();
         if (!Enum.IsDefined(checksumAlgorithm))
             throw new BinaryFormatNotSupportedException($"Unknown checksum algorithm: {checksumAlgorithm}.");
-        string? customChecksumName = ReadOptionalString(reader);
+        var customChecksum = reader.ReadOptionalString();
 
         var encryption = (EncryptionAlgorithm)reader.ReadByte();
         if (!Enum.IsDefined(encryption))
             throw new BinaryFormatNotSupportedException($"Unknown encryption algorithm: {encryption}.");
-        string? customEncryptionName = ReadOptionalString(reader);
+        var customEncryption = reader.ReadOptionalString();
 
-        string? keyId = ReadOptionalString(reader);
+        var keyId = reader.ReadOptionalString();
 
         int uncompressedLength = reader.ReadInt32();
         int compressedLength = reader.ReadInt32();
@@ -89,21 +93,11 @@ internal readonly record struct BinaryFormatHeaderV1(
             throw new BinaryFormatException($"Checksum bytes ended early. Expected {checksumLength}, got {checksum.Length}.");
 
         return new BinaryFormatHeaderV1(
-            formatVersion,
-            compression, customCompressionName,
-            checksumAlgorithm, customChecksumName,
-            encryption, customEncryptionName,
+            compression, customCompression,
+            checksumAlgorithm, customChecksum,
+            encryption, customEncryption,
             keyId,
             uncompressedLength, compressedLength, onDiskLength,
             checksum);
     }
-
-    private static void WriteOptionalString(BinaryWriter writer, string? value)
-    {
-        bool has = !string.IsNullOrEmpty(value);
-        writer.Write(has);
-        if (has) writer.Write(value!);
-    }
-
-    private static string? ReadOptionalString(BinaryReader reader) => reader.ReadBoolean() ? reader.ReadString() : null;
 }

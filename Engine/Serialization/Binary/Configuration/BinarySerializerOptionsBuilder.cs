@@ -1,0 +1,61 @@
+﻿using Engine.Serialization.Binary.Checksum;
+using Engine.Serialization.Binary.Compression;
+using Engine.Serialization.Binary.Encryption;
+using Engine.Serialization.Binary.Format;
+
+namespace Engine.Serialization.Binary.Configuration;
+
+public sealed class BinarySerializerOptionsBuilder
+{
+    private ICompressionAlgorithm? _compression;
+    private IChecksumAlgorithm? _checksum;
+    private IEncryptionAlgorithm? _encryption;
+    private byte[]? _key;
+    private string? _keyId;
+    private int _writeVersion = BinaryFormatConstants.LatestVersion;
+    private bool _allowV0Fallback = false;
+
+    public BinarySerializerOptionsBuilder WithCompression(ICompressionAlgorithm compression)
+    {
+        _compression = compression;
+        return this;
+    }
+
+    public BinarySerializerOptionsBuilder WithChecksum(IChecksumAlgorithm checksum)
+    {
+        _checksum = checksum;
+        return this;
+    }
+
+    public BinarySerializerOptionsBuilder WithEncryption(IEncryptionAlgorithm encryption, byte[]? key = null, string? keyId = null)
+    {
+        _encryption = encryption;
+        _key = key;
+        _keyId = keyId;
+        return this;
+    }
+
+    public BinarySerializerOptionsBuilder WithVersion(int version)
+    {
+        _writeVersion = version;
+        return this;
+    }
+
+    public BinarySerializerOptionsBuilder AllowV0Fallback(bool allow = true)
+    {
+        _allowV0Fallback = allow;
+        return this;
+    }
+
+    public BinarySerializerOptions Build()
+    {
+        return new BinarySerializerOptions
+        {
+            Compressor = AlgorithmResolver.ResolveCompressor(_compression),
+            Checksum = AlgorithmResolver.ResolveChecksum(_checksum),
+            Encryptor = AlgorithmResolver.ResolveEncryptor(_encryption, _key, _keyId),
+            WriteVersion = _writeVersion,
+            AllowV0Fallback = _allowV0Fallback
+        };
+    }
+}

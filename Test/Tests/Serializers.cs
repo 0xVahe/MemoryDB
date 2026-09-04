@@ -29,25 +29,15 @@ public static class Serializers
         int writeVersion = 1,
         bool allowV0Fallback = false)
     {
-        var compressor = new Compressor(compressionAlgorithm ?? new NoCompression());
-        var checksumCalculator = new ChecksumCalculator(checksumAlgorithm ?? new NoChecksum());
+        var options = BinarySerializerOptions.Configure()
+            .WithCompression(compressionAlgorithm ?? new NoCompression())
+            .WithChecksum(checksumAlgorithm ?? new NoChecksum())
+            .WithEncryption(encryptionAlgorithm ?? new NoEncryption(), key ?? Secrets.Key, defaultKeyId ?? Secrets.KeyId)
+            .WithVersion(writeVersion)
+            .AllowV0Fallback(allowV0Fallback)
+            .Build();
 
-        key ??= Secrets.Key;
-        defaultKeyId ??= Secrets.KeyId;
-        var encryptor =  new Encryptor(encryptionAlgorithm ?? new NoEncryption(), key, defaultKeyId);
-
-        var options = new BinarySerializerOptions
-        {
-            Compressor = compressor,
-            Checksum = checksumCalculator,
-            Encryptor = encryptor,
-            WriteVersion = writeVersion,
-            AllowV0Fallback = allowV0Fallback
-        };
-
-        var binarySerializer = new BinarySerializer(options);
-        var serializer = new BinarySerializerStrategy(binarySerializer);
-
+        var serializer = new BinarySerializerStrategy(new BinarySerializer(options));
         return ("BinarySerializer", ".bin", serializer);
     }
     
