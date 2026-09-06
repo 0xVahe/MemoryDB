@@ -11,50 +11,48 @@ public sealed class Aes256Gcm : IEncryptionAlgorithm
 
     public EncryptionAlgorithm Kind => EncryptionAlgorithm.Aes256Gcm;
     public string? CustomName => null;
+    public int GetMaxCiphertextLength(int plaintextLength) => NonceSizeBytes + plaintextLength + TagSizeBytes;
 
-    public byte[] Encrypt(byte[] plaintext, byte[] key)
+    public int Encrypt(ReadOnlySpan<byte> plaintext, ReadOnlySpan<byte> key, Span<byte> destination)
     {
-        ArgumentNullException.ThrowIfNull(plaintext);
         ValidateKey(key);
 
-        Span<byte> nonce = stackalloc byte[NonceSizeBytes];
-        RandomNumberGenerator.Fill(nonce);
+        int required = GetMaxCiphertextLength(plaintext.Length);
+        if (destination.Length < required)
+            throw new BinaryFormatException($"Destination buffer too small for AES-GCM output. Need {required}, got {destination.Length}.");
 
-        var ciphertext = new byte[plaintext.Length];
-        var tag = new byte[TagSizeBytes];
+        var nonce = destination[..NonceSizeBytes];
+        var ciphertext = destination.Slice(NonceSizeBytes, plaintext.Length);
+        var tag = destination.Slice(NonceSizeBytes + plaintext.Length, TagSizeBytes);
+
+        RandomNumberGenerator.Fill(nonce);
 
         using var aes = new AesGcm(key, TagSizeBytes);
         aes.Encrypt(nonce, plaintext, ciphertext, tag);
 
-        var result = new byte[NonceSizeBytes + ciphertext.Length + TagSizeBytes];
-        nonce.CopyTo(result);
-        ciphertext.CopyTo(result, NonceSizeBytes);
-        tag.CopyTo(result, NonceSizeBytes + ciphertext.Length);
-        return result;
+        return NonceSizeBytes + plaintext.Length + TagSizeBytes;
     }
 
-    public byte[] Decrypt(byte[] ciphertext, byte[] key, int expectedPlaintextLength)
+    public int Decrypt(ReadOnlySpan<byte> ciphertext, ReadOnlySpan<byte> key, Span<byte> destination)
     {
-        ArgumentNullException.ThrowIfNull(ciphertext);
         ValidateKey(key);
 
         if (ciphertext.Length < NonceSizeBytes + TagSizeBytes)
             throw new BinaryFormatException("Ciphertext is too short for AES-GCM.");
 
-        int expectedLength = NonceSizeBytes + expectedPlaintextLength + TagSizeBytes;
-        if (ciphertext.Length != expectedLength)
-            throw new BinaryFormatException($"Ciphertext length mismatch. Expected {expectedLength}, got {ciphertext.Length}.");
+        int plaintextLength = ciphertext.Length - NonceSizeBytes - TagSizeBytes;
+        if (destination.Length < plaintextLength)
+            throw new BinaryFormatException($"Destination buffer too small for decrypted output. Need {plaintextLength}, got {destination.Length}.");
 
-        var nonce = ciphertext.AsSpan(0, NonceSizeBytes);
-        var encryptedPayload = ciphertext.AsSpan(NonceSizeBytes, expectedPlaintextLength);
-        var tag = ciphertext.AsSpan(NonceSizeBytes + expectedPlaintextLength, TagSizeBytes);
+        var nonce = ciphertext[..NonceSizeBytes];
+        var encryptedPayload = ciphertext.Slice(NonceSizeBytes, plaintextLength);
+        var tag = ciphertext.Slice(NonceSizeBytes + plaintextLength, TagSizeBytes);
 
-        var plaintext = new byte[expectedPlaintextLength];
         try
         {
             using var aes = new AesGcm(key, TagSizeBytes);
-            aes.Decrypt(nonce, encryptedPayload, tag, plaintext);
-            return plaintext;
+            aes.Decrypt(nonce, encryptedPayload, tag, destination[..plaintextLength]);
+            return plaintextLength;
         }
         catch (CryptographicException ex)
         {
@@ -62,9 +60,8 @@ public sealed class Aes256Gcm : IEncryptionAlgorithm
         }
     }
 
-    private static void ValidateKey(byte[] key)
+    private static void ValidateKey(ReadOnlySpan<byte> key)
     {
-        ArgumentNullException.ThrowIfNull(key);
         if (key.Length != KeySizeBytes)
             throw new ArgumentException($"Aes256Gcm requires a {KeySizeBytes}-byte (256-bit) key, got {key.Length}.", nameof(key));
     }

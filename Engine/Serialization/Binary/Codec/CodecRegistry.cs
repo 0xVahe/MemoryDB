@@ -1,8 +1,7 @@
 ﻿using System.Text;
 using Engine.Serialization.Binary.Metadata;
-using Engine.Serialization.Binary.Codec;
 
-namespace Engine.Serialization.Binary.Format;
+namespace Engine.Serialization.Binary.Codec;
 
 internal static class CodecRegistry
 {

@@ -1,4 +1,4 @@
-﻿using Engine.Serialization.Binary.Format;
+﻿using Engine.Serialization.Binary.Codec;
 using Engine.Serialization.Binary.Versioning;
 
 namespace Engine.Serialization.Binary;

@@ -10,23 +10,34 @@ public static class StreamExtensions
         serializer.Serialize(destination, data);
     }
     
+    public static T? Deserialize<T>(this Stream source, BinarySerializerOptions options) where T : class
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(options);
+
+        var serializer = new BinarySerializer(options);
+        return serializer.Deserialize<T>(source);
+    }
+
+    public static T? Deserialize<T>(this Stream source) where T : class
+    {
+        return Deserialize<T>(source, (byte[]?)null);
+    }
+
     public static T? Deserialize<T>(this Stream source, byte[]? key) where T : class
     {
         ArgumentNullException.ThrowIfNull(source);
 
         var options = BinarySerializerOptions.FromStream(source, key);
-        var serializer = new BinarySerializer(options);
-
-        return serializer.Deserialize<T>(source);
+        return Deserialize<T>(source, options);
     }
 
-    public static T? Deserialize<T>(this Stream source, Func<string?, byte[]?>? keyResolver = null) where T : class
+    public static T? Deserialize<T>(this Stream source, Func<string?, byte[]?> keyResolver) where T : class
     {
         ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(keyResolver);
 
-        var options = BinarySerializerOptions.FromStream(source, keyResolver ?? (_ => null));
-        var serializer = new BinarySerializer(options);
-
-        return serializer.Deserialize<T>(source);
+        var options = BinarySerializerOptions.FromStream(source, keyResolver);
+        return Deserialize<T>(source, options);
     }
 }

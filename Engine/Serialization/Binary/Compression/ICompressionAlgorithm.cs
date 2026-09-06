@@ -4,6 +4,7 @@ public interface ICompressionAlgorithm
 {
     CompressionAlgorithm Kind { get; }
     string? CustomName { get; }
-    Stream Wrap(Stream destination);
-    Stream Unwrap(Stream source);
+    int GetMaxCompressedLength(int uncompressedLength);
+    int Compress(ReadOnlySpan<byte> source, Span<byte> destination);
+    int Decompress(ReadOnlySpan<byte> source, Span<byte> destination);
 }

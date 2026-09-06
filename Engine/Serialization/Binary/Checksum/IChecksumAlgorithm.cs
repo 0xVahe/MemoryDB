@@ -4,5 +4,6 @@ public interface IChecksumAlgorithm
 {
     ChecksumAlgorithm Kind { get; }
     string? CustomName { get; }
-    byte[] Compute(ReadOnlySpan<byte> data);
+    int HashSizeInBytes { get; }
+    void Compute(ReadOnlySpan<byte> source, Span<byte> destination);
 }

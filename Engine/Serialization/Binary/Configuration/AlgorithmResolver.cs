@@ -7,26 +7,55 @@ namespace Engine.Serialization.Binary.Configuration;
 public static class AlgorithmResolver
 {
     public static ICompressor ResolveCompressor(ICompressionAlgorithm? algorithm = null) =>
-        new Compressor(algorithm ?? new NoCompression());
+        algorithm is null || algorithm.Kind == CompressionAlgorithm.None
+            ? Compressor.None
+            : new Compressor(algorithm);
 
     public static ICompressor ResolveCompressor(CompressionAlgorithm kind, string? customName = null) =>
-        new Compressor(CompressionAlgorithmRegistry.Resolve(kind, customName));
+        kind == CompressionAlgorithm.None
+            ? Compressor.None
+            : new Compressor(CompressionAlgorithmRegistry.Resolve(kind, customName));
 
     public static IChecksumCalculator ResolveChecksum(IChecksumAlgorithm? algorithm = null) =>
-        new ChecksumCalculator(algorithm ?? new NoChecksum());
+        algorithm is null || algorithm.Kind == ChecksumAlgorithm.None
+            ? ChecksumCalculator.None
+            : new ChecksumCalculator(algorithm);
 
     public static IChecksumCalculator ResolveChecksum(ChecksumAlgorithm kind, string? customName = null) =>
-        new ChecksumCalculator(ChecksumAlgorithmRegistry.Resolve(kind, customName));
+        kind == ChecksumAlgorithm.None
+            ? ChecksumCalculator.None
+            : new ChecksumCalculator(ChecksumAlgorithmRegistry.Resolve(kind, customName));
 
-    public static IEncryptor ResolveEncryptor(IEncryptionAlgorithm? algorithm = null, byte[]? key = null, string? keyId = null) =>
-        algorithm is null || algorithm.Kind == EncryptionAlgorithm.None
-            ? Encryptor.None()
-            : new Encryptor(algorithm, key, keyId);
-
-    public static IEncryptor ResolveEncryptor(EncryptionAlgorithm kind, string? customName = null, byte[]? key = null, string? keyId = null)
+    public static IEncryptor ResolveEncryptor(
+        IEncryptionAlgorithm? algorithm = null, 
+        byte[]? key = null, 
+        Func<string?, byte[]?>? keyResolver = null, 
+        string? keyId = null)
     {
-        if (kind == EncryptionAlgorithm.None) return Encryptor.None();
+        if (algorithm is null || algorithm.Kind == EncryptionAlgorithm.None)
+            return Encryptor.None;
+
+        if (keyResolver is not null)
+            return new Encryptor(algorithm, keyResolver, keyId);
+
+        return new Encryptor(algorithm, key ?? [], keyId);
+    }
+
+    public static IEncryptor ResolveEncryptor(
+        EncryptionAlgorithm kind, 
+        string? customName = null, 
+        byte[]? key = null, 
+        Func<string?, byte[]?>? keyResolver = null, 
+        string? keyId = null)
+    {
+        if (kind == EncryptionAlgorithm.None) 
+            return Encryptor.None;
+
         var algorithm = EncryptionAlgorithmRegistry.Resolve(kind, customName);
-        return new Encryptor(algorithm, key, keyId);
+
+        if (keyResolver is not null)
+            return new Encryptor(algorithm, keyResolver, keyId);
+
+        return new Encryptor(algorithm, key ?? [], keyId);
     }
 }

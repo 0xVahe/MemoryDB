@@ -13,6 +13,7 @@ public sealed class BinarySerializerOptionsBuilder
     private IChecksumAlgorithm? _checksum;
     private IEncryptionAlgorithm? _encryption;
     private byte[]? _key;
+    private Func<string?, byte[]?>? _keyResolver;
     private string? _keyId;
     private int _writeVersion = BinaryFormatConstants.LatestVersion;
     private bool _allowV0Fallback = false;
@@ -33,6 +34,16 @@ public sealed class BinarySerializerOptionsBuilder
     {
         _encryption = encryption;
         _key = key;
+        _keyResolver = null;
+        _keyId = keyId;
+        return this;
+    }
+
+    public BinarySerializerOptionsBuilder WithEncryption(IEncryptionAlgorithm encryption, Func<string?, byte[]?> keyResolver, string? keyId = null)
+    {
+        _encryption = encryption;
+        _key = null;
+        _keyResolver = keyResolver;
         _keyId = keyId;
         return this;
     }
@@ -55,7 +66,7 @@ public sealed class BinarySerializerOptionsBuilder
         {
             Compressor = AlgorithmResolver.ResolveCompressor(_compression),
             Checksum = AlgorithmResolver.ResolveChecksum(_checksum),
-            Encryptor = AlgorithmResolver.ResolveEncryptor(_encryption, _key, _keyId),
+            Encryptor = AlgorithmResolver.ResolveEncryptor(_encryption, _key, _keyResolver, _keyId),
             WriteVersion = _writeVersion,
             AllowV0Fallback = _allowV0Fallback
         };

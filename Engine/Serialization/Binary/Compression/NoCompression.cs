@@ -4,6 +4,17 @@ public sealed class NoCompression : ICompressionAlgorithm
 {
     public CompressionAlgorithm Kind => CompressionAlgorithm.None;
     public string? CustomName => null;
-    public Stream Wrap(Stream destination) => destination;
-    public Stream Unwrap(Stream source) => source;
+    public int GetMaxCompressedLength(int uncompressedLength) => uncompressedLength;
+
+    public int Compress(ReadOnlySpan<byte> source, Span<byte> destination)
+    {
+        source.CopyTo(destination);
+        return source.Length;
+    }
+
+    public int Decompress(ReadOnlySpan<byte> source, Span<byte> destination)
+    {
+        source.CopyTo(destination);
+        return source.Length;
+    }
 }

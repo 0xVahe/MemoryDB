@@ -4,6 +4,7 @@ public interface IEncryptionAlgorithm
 {
     EncryptionAlgorithm Kind { get; }
     string? CustomName { get; }
-    byte[] Encrypt(byte[] plaintext, byte[] key);
-    byte[] Decrypt(byte[] ciphertext, byte[] key, int expectedPlaintextLength);
+    int GetMaxCiphertextLength(int plaintextLength);
+    int Encrypt(ReadOnlySpan<byte> plaintext, ReadOnlySpan<byte> key, Span<byte> destination);
+    int Decrypt(ReadOnlySpan<byte> ciphertext, ReadOnlySpan<byte> key, Span<byte> destination);
 }

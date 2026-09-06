@@ -15,9 +15,9 @@ public sealed record BinarySerializerOptions
     
     public static BinarySerializerOptionsBuilder Configure() => new();
 
-    public ICompressor Compressor { get; init; } = Compression.Compressor.None();
-    public IChecksumCalculator Checksum { get; init; } = ChecksumCalculator.None();
-    public IEncryptor Encryptor { get; init; } = Encryption.Encryptor.None();
+    public ICompressor Compressor { get; init; } = Compression.Compressor.None;
+    public IChecksumCalculator Checksum { get; init; } = ChecksumCalculator.None;
+    public IEncryptor Encryptor { get; init; } = Encryption.Encryptor.None;
     public int WriteVersion { get; init; } = BinaryFormatConstants.LatestVersion;
     public bool AllowV0Fallback { get; init; } = false;
     
@@ -27,21 +27,18 @@ public sealed record BinarySerializerOptions
         {
             Compressor = AlgorithmResolver.ResolveCompressor(info.Compression, info.CustomCompressionName),
             Checksum = AlgorithmResolver.ResolveChecksum(info.ChecksumAlgorithm, info.CustomChecksumName),
-            Encryptor = AlgorithmResolver.ResolveEncryptor(info.Encryption, info.CustomEncryptionName, key, info.KeyId)
+            Encryptor = AlgorithmResolver.ResolveEncryptor(info.Encryption, info.CustomEncryptionName, key: key, keyId: info.KeyId)
         };
     }
     
-    public static BinarySerializerOptions FromHeader(
-        BinaryHeaderInfo info, 
-        Func<string?, byte[]?>? keyResolver)
+    public static BinarySerializerOptions FromHeader(BinaryHeaderInfo info, Func<string?, byte[]?> keyResolver)
     {
-        byte[]? key = null;
-        if (info.Encryption != EncryptionAlgorithm.None && keyResolver != null)
+        return new BinarySerializerOptions
         {
-            key = keyResolver(info.KeyId);
-        }
-
-        return FromHeader(info, key);
+            Compressor = AlgorithmResolver.ResolveCompressor(info.Compression, info.CustomCompressionName),
+            Checksum = AlgorithmResolver.ResolveChecksum(info.ChecksumAlgorithm, info.CustomChecksumName),
+            Encryptor = AlgorithmResolver.ResolveEncryptor(info.Encryption, info.CustomEncryptionName, keyResolver: keyResolver, keyId: info.KeyId)
+        };
     }
     
     public static BinarySerializerOptions FromStream(Stream stream, byte[]? key = null)
