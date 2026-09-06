@@ -3,12 +3,14 @@ using Engine.Serialization.Binary.Checksum;
 using Engine.Serialization.Binary.Compression;
 using Engine.Serialization.Binary.Encryption;
 using Engine.Serialization.Binary.Metadata;
+using Engine.Serialization.Binary.Exceptions;
 using Engine.Serialization.Binary.Configuration;
 
 namespace Engine.Serialization.Binary;
 
 public sealed record BinarySerializerOptions
 {
+    internal BinarySerializerOptions() {}
     public static BinarySerializerOptions Default { get; } = new();
     
     public static BinarySerializerOptionsBuilder Configure() => new();
@@ -40,5 +42,21 @@ public sealed record BinarySerializerOptions
         }
 
         return FromHeader(info, key);
+    }
+    
+    public static BinarySerializerOptions FromStream(Stream stream, byte[]? key = null)
+    {
+        var info = BinaryFormatInspector.Peek(stream)
+                   ?? throw new BinaryFormatException("Unable to inspect stream header. Format is unknown or unsupported.");
+
+        return FromHeader(info, key);
+    }
+    
+    public static BinarySerializerOptions FromStream(Stream stream, Func<string?, byte[]?> keyResolver)
+    {
+        var info = BinaryFormatInspector.Peek(stream)
+                   ?? throw new BinaryFormatException("Unable to inspect stream header. Format is unknown or unsupported.");
+
+        return FromHeader(info, keyResolver);
     }
 }

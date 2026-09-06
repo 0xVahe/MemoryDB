@@ -14,9 +14,14 @@ public static class Serializers
             ".bin", 
             new BinarySerializerStrategy(
                 new BinarySerializer(
-                    new BinarySerializerOptions() with { WriteVersion = 0, AllowV0Fallback = true }
+                    BinarySerializerOptions.Default with 
+                    { 
+                        WriteVersion = 0, 
+                        AllowV0Fallback = true 
+                    }
                 )
             ));
+    
     public static (string name, string extension, IStorageSerializer serializer) DefaultBinary
         => ("BinarySerializer", ".bin", new BinarySerializerStrategy());
     

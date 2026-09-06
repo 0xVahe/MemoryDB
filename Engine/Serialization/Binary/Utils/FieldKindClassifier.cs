@@ -1,10 +1,15 @@
 ﻿using System.Collections;
+using System.Collections.Concurrent;
 
 namespace Engine.Serialization.Binary.Utils;
 
 internal static class FieldKindClassifier
 {
-    public static TypeShape Classify(Type type)
+    private static readonly ConcurrentDictionary<Type, TypeShape> Cache = new();
+
+    public static TypeShape Classify(Type type) => Cache.GetOrAdd(type, ClassifyCore);
+
+    private static TypeShape ClassifyCore(Type type)
     {
         if (type == typeof(string)) return TypeShape.String();
         if (type == typeof(Guid)) return TypeShape.Guid();

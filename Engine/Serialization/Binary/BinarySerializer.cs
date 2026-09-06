@@ -16,6 +16,9 @@ public sealed class BinarySerializer
         _router = new BinaryFormatRouter(codecs);
     }
 
+    public void Serialize<T>(Stream destination, T data) where T : class =>
+        _router.Serialize(destination, data, _options.WriteVersion);
+    
     public byte[] Serialize<T>(T data) where T : class
     {
         using var ms = new MemoryStream();
@@ -23,9 +26,9 @@ public sealed class BinarySerializer
         return ms.ToArray();
     }
 
-    public void Serialize<T>(Stream destination, T data) where T : class =>
-        _router.Serialize(destination, data, _options.WriteVersion);
-
+    public T? Deserialize<T>(Stream source) where T : class => 
+        _router.Deserialize<T>(source);
+    
     public T? Deserialize<T>(byte[] bytes) where T : class
     {
         ArgumentNullException.ThrowIfNull(bytes);
@@ -34,7 +37,4 @@ public sealed class BinarySerializer
         using var ms = new MemoryStream(bytes);
         return Deserialize<T>(ms);
     }
-
-    public T? Deserialize<T>(Stream source) where T : class => 
-        _router.Deserialize<T>(source);
 }

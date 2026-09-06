@@ -7,6 +7,8 @@ namespace Engine.Serialization.Binary.Configuration;
 
 public sealed class BinarySerializerOptionsBuilder
 {
+    internal BinarySerializerOptionsBuilder() {}
+
     private ICompressionAlgorithm? _compression;
     private IChecksumAlgorithm? _checksum;
     private IEncryptionAlgorithm? _encryption;
