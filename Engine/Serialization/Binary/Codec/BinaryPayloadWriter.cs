@@ -7,6 +7,7 @@ namespace Engine.Serialization.Binary.Codec;
 
 internal sealed class BinaryPayloadWriter(BinaryWriter writer)
 {
+    private readonly HashSet<object> _activeAncestors = new(ReferenceEqualityComparer.Instance);
     public void Serialize<T>(T data) where T : class => WriteValue(data, typeof(T));
 
     private void WriteValue(object? value, Type declaredType)
@@ -129,8 +130,24 @@ internal sealed class BinaryPayloadWriter(BinaryWriter writer)
 
     private void WriteNested(object value)
     {
-        var plan = TypeAccessorCache.GetOrBuild(value.GetType());
-        foreach (var accessor in plan.Members)
-            WriteValue(accessor.Getter(value), accessor.MemberType);
+        var type = value.GetType();
+        bool tracksForCycles = !type.IsValueType;
+        if (tracksForCycles && !_activeAncestors.Add(value))
+            throw new BinaryTypeException(
+                $"Circular reference detected while serializing '{value.GetType()}' — an object " +
+                "of this type refers back to an ancestor already being written. Circular object " +
+                "graphs are not supported (no reference-preservation); break the cycle before " +
+                "serializing, or exclude one side of it with [BinaryIgnore].");
+        
+        try
+        {
+            var plan = TypeAccessorCache.GetOrBuild(value.GetType());
+            foreach (var accessor in plan.Members)
+                WriteValue(accessor.Getter(value), accessor.MemberType);
+        }
+        finally
+        {
+            if (tracksForCycles) _activeAncestors.Remove(value);
+        }
     }
 }
