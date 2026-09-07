@@ -134,14 +134,14 @@ internal sealed class BinaryPayloadWriter(BinaryWriter writer)
         bool tracksForCycles = !type.IsValueType;
         if (tracksForCycles && !_activeAncestors.Add(value))
             throw new BinaryTypeException(
-                $"Circular reference detected while serializing '{value.GetType()}' — an object " +
+                $"Circular reference detected while serializing '{type}' — an object " +
                 "of this type refers back to an ancestor already being written. Circular object " +
                 "graphs are not supported (no reference-preservation); break the cycle before " +
                 "serializing, or exclude one side of it with [BinaryIgnore].");
         
         try
         {
-            var plan = TypeAccessorCache.GetOrBuild(value.GetType());
+            var plan = TypeAccessorCache.GetOrBuild(type);
             foreach (var accessor in plan.Members)
                 WriteValue(accessor.Getter(value), accessor.MemberType);
         }
